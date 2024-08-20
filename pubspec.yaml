@@ -63,4 +63,5 @@ flutter:
 
   assets:
     - assets/songs.json
+    - assets/logo.jpg
 
