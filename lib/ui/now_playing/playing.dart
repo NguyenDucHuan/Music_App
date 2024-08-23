@@ -33,7 +33,8 @@ class _NowPlayingPageState extends State<NowPlayingPage>
     with SingleTickerProviderStateMixin {
   late AnimationController _imageAnimationController;
   late AudioPlayerManager _audioPlayerManager;
-
+  late int _selectedItemIndex;
+  late Song _song;
   @override
   void initState() {
     super.initState();
@@ -42,6 +43,9 @@ class _NowPlayingPageState extends State<NowPlayingPage>
     _audioPlayerManager =
         AudioPlayerManager(songUrl: widget.playingSong.source);
     _audioPlayerManager.init();
+    _selectedItemIndex= widget.songs.indexOf(widget.playingSong);
+    _song = widget.playingSong;
+    _audioPlayerManager.player.play();
   }
 
   @override
@@ -72,9 +76,9 @@ class _NowPlayingPageState extends State<NowPlayingPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(widget.playingSong.album),
+              Text(_song.album),
               const Text('-------'),
-              Text('Mã Bài  ${widget.playingSong.id}'),
+              Text('Mã Bài  ${_song.id}'),
               const SizedBox(
                 height: 30,
               ),
@@ -85,7 +89,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                   borderRadius: BorderRadius.circular(radius),
                   child: FadeInImage.assetNetwork(
                     placeholder: 'assets/logo.jpg',
-                    image: widget.playingSong.image,
+                    image: _song.image,
                     width: screenWidth - delta,
                     height: screenWidth - delta,
                     imageErrorBuilder: (context, error, stackTrace) {
@@ -115,7 +119,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                       Column(
                         children: [
                           Text(
-                            widget.playingSong.title,
+                            _song.title,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium!
@@ -126,7 +130,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                                         .color),
                           ),
                           Text(
-                            widget.playingSong.artist,
+                            _song.artist,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium!
@@ -171,23 +175,23 @@ class _NowPlayingPageState extends State<NowPlayingPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          MediaButtonController(
+          const MediaButtonController(
               function: null,
               icon: Icons.shuffle,
               color: Colors.purpleAccent,
               size: 30),
           MediaButtonController(
-              function: null,
+              function: _setPrevSong,
               icon: Icons.skip_previous,
               color: Colors.purpleAccent,
               size: 30),
           _playingButton(),
           MediaButtonController(
-              function: null,
+              function: _setNextSong,
               icon: Icons.skip_next,
               color: Colors.purpleAccent,
               size: 30),
-          MediaButtonController(
+          const MediaButtonController(
               function: null,
               icon: Icons.repeat,
               color: Colors.purpleAccent,
@@ -262,6 +266,23 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                 size: 48);
           }
         });
+  }
+
+  void _setNextSong(){
+    ++_selectedItemIndex;
+    final nextSong = widget.songs[_selectedItemIndex];
+    _audioPlayerManager.updatSongUrl(nextSong.source);
+    setState(() {
+      _song = nextSong;
+    });
+  }
+  void _setPrevSong(){
+    --_selectedItemIndex;
+    final prevSong = widget.songs[_selectedItemIndex];
+    _audioPlayerManager.updatSongUrl(prevSong.source);
+    setState(() {
+      _song = prevSong;
+    });
   }
 }
 
