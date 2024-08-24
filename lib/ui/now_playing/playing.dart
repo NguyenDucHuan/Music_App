@@ -35,22 +35,24 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   late AudioPlayerManager _audioPlayerManager;
   late int _selectedItemIndex;
   late Song _song;
+  double _curenAnimationPosition = 0.0;
+
   @override
   void initState() {
     super.initState();
     _imageAnimationController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 12));
+        vsync: this, duration: const Duration(seconds: 15));
     _audioPlayerManager =
         AudioPlayerManager(songUrl: widget.playingSong.source);
     _audioPlayerManager.init();
-    _selectedItemIndex= widget.songs.indexOf(widget.playingSong);
+    _selectedItemIndex = widget.songs.indexOf(widget.playingSong);
     _song = widget.playingSong;
-    _audioPlayerManager.player.play();
   }
 
   @override
   void dispose() {
     _audioPlayerManager.dispose();
+    _imageAnimationController.dispose();
     super.dispose();
   }
 
@@ -234,6 +236,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
           final playing = playState?.playing;
           if (processingState == ProcessingState.loading ||
               processingState == ProcessingState.buffering) {
+            _pauseRotationAnim();
             return Container(
               margin: const EdgeInsets.all(8),
               width: 48,
@@ -249,17 +252,25 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                 color: null,
                 size: 48);
           } else if (processingState != ProcessingState.completed) {
+            _playRotationAnim();
             return MediaButtonController(
                 function: () {
                   _audioPlayerManager.player.pause();
+                  _pauseRotationAnim();
                 },
                 icon: Icons.pause_circle,
                 color: null,
                 size: 48);
           } else {
+            if(processingState == ProcessingState.completed){
+              _stopRotationAnim();
+              _resetRotationAnim();
+            }
             return MediaButtonController(
                 function: () {
-                  _audioPlayerManager.player.seek(Duration.zero);
+                  _curenAnimationPosition = 0.0;
+                  _resetRotationAnim();
+                  _playRotationAnim();
                 },
                 icon: Icons.replay,
                 color: null,
@@ -268,21 +279,40 @@ class _NowPlayingPageState extends State<NowPlayingPage>
         });
   }
 
-  void _setNextSong(){
+  void _setNextSong() {
     ++_selectedItemIndex;
     final nextSong = widget.songs[_selectedItemIndex];
     _audioPlayerManager.updatSongUrl(nextSong.source);
     setState(() {
       _song = nextSong;
     });
+    _resetRotationAnim();
   }
-  void _setPrevSong(){
+
+  void _setPrevSong() {
     --_selectedItemIndex;
     final prevSong = widget.songs[_selectedItemIndex];
     _audioPlayerManager.updatSongUrl(prevSong.source);
     setState(() {
       _song = prevSong;
     });
+    _resetRotationAnim();
+  }
+
+  void _playRotationAnim(){
+    _imageAnimationController.forward(from: _curenAnimationPosition);
+    _imageAnimationController.repeat();
+  }
+  void _pauseRotationAnim(){
+      _stopRotationAnim();
+      _curenAnimationPosition = _imageAnimationController.value;
+  }
+  void _stopRotationAnim(){
+      _imageAnimationController.stop();
+  }
+  void _resetRotationAnim(){
+      _curenAnimationPosition = 0.0;
+      _imageAnimationController.value = _curenAnimationPosition;
   }
 }
 
