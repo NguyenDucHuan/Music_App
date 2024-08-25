@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -35,20 +37,31 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   late AudioPlayerManager _audioPlayerManager;
   late int _selectedItemIndex;
   late Song _song;
+  late LoopMode _loopMode;
   double _curenAnimationPosition = 0.0;
+  bool _isshuffle = false;
 
   @override
   void initState() {
     super.initState();
-    _imageAnimationController = AnimationController(
-        vsync: this, duration: const Duration(seconds: 15));
+    _imageAnimationController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 15));
     _audioPlayerManager =
         AudioPlayerManager(songUrl: widget.playingSong.source);
     _audioPlayerManager.init();
     _selectedItemIndex = widget.songs.indexOf(widget.playingSong);
     _song = widget.playingSong;
+    _loopMode = LoopMode.off;
+    _audioPlayerManager.player.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        _onSongComplete();
+      }
+    });
   }
-
+  void _onSongComplete() {
+    // When the current song is completed, play the next song
+    _setNextSong();
+  }
   @override
   void dispose() {
     _audioPlayerManager.dispose();
@@ -177,10 +190,10 @@ class _NowPlayingPageState extends State<NowPlayingPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          const MediaButtonController(
-              function: null,
+          MediaButtonController(
+              function: _setShuffle,
               icon: Icons.shuffle,
-              color: Colors.purpleAccent,
+              color: _getShuffleColor(),
               size: 30),
           MediaButtonController(
               function: _setPrevSong,
@@ -193,14 +206,39 @@ class _NowPlayingPageState extends State<NowPlayingPage>
               icon: Icons.skip_next,
               color: Colors.purpleAccent,
               size: 30),
-          const MediaButtonController(
-              function: null,
-              icon: Icons.repeat,
-              color: Colors.purpleAccent,
+          MediaButtonController(
+              function: _setRepeatOption,
+              icon: _repeatingIcon(),
+              color: _getReapetColor(),
               size: 24),
         ],
       ),
     );
+  }
+
+  Color? _getReapetColor() {
+    return _loopMode == LoopMode.off ? Colors.grey : Colors.purpleAccent;
+  }
+
+  void _setRepeatOption() {
+    if (_loopMode == LoopMode.off) {
+      _loopMode = LoopMode.one;
+    } else if (_loopMode == LoopMode.one) {
+      _loopMode = LoopMode.all;
+    } else {
+      _loopMode = LoopMode.off;
+    }
+    setState(() {
+      _audioPlayerManager.player.setLoopMode(_loopMode);
+    });
+  }
+
+  IconData _repeatingIcon() {
+    return switch (_loopMode) {
+      LoopMode.one => Icons.repeat_one,
+      LoopMode.all => Icons.repeat_on,
+      _ => Icons.repeat
+    };
   }
 
   StreamBuilder<DurationState> _progessBar() {
@@ -225,6 +263,16 @@ class _NowPlayingPageState extends State<NowPlayingPage>
             thumbCanPaintOutsideBar: true,
           );
         });
+  }
+
+  void _setShuffle() {
+    setState(() {
+      _isshuffle = !_isshuffle;
+    });
+  }
+
+  Color? _getShuffleColor() {
+    return _isshuffle ? Colors.purpleAccent : Colors.grey;
   }
 
   StreamBuilder<PlayerState> _playingButton() {
@@ -262,7 +310,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                 color: null,
                 size: 48);
           } else {
-            if(processingState == ProcessingState.completed){
+            if (processingState == ProcessingState.completed) {
               _stopRotationAnim();
               _resetRotationAnim();
             }
@@ -280,39 +328,65 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   }
 
   void _setNextSong() {
-    ++_selectedItemIndex;
+    if (_isshuffle) {
+      _selectedItemIndex = Random().nextInt(widget.songs.length);
+    } else {
+      _selectedItemIndex++;
+      if (_selectedItemIndex >= widget.songs.length) {
+        if (_loopMode == LoopMode.all) {
+          _selectedItemIndex = 0; // Loop to the first song
+        } else {
+          _selectedItemIndex = widget.songs.length - 1; // Stay on last
+        }
+      }
+    }
+    _playSelectedSong();
+  }
+
+  void _setPrevSong() {
+    if (_isshuffle) {
+      _selectedItemIndex = Random().nextInt(widget.songs.length);
+    } else {
+      _selectedItemIndex--;
+      if (_selectedItemIndex < 0) {
+        if (_loopMode == LoopMode.all) {
+          _selectedItemIndex = widget.songs.length - 1; // Loop to the last song
+        } else {
+          _selectedItemIndex = 0; // Stay on first
+        }
+      }
+    }
+
+    _playSelectedSong();
+  }
+
+  void _playSelectedSong(){
     final nextSong = widget.songs[_selectedItemIndex];
     _audioPlayerManager.updatSongUrl(nextSong.source);
     setState(() {
       _song = nextSong;
     });
     _resetRotationAnim();
+    _audioPlayerManager.player.play();
   }
 
-  void _setPrevSong() {
-    --_selectedItemIndex;
-    final prevSong = widget.songs[_selectedItemIndex];
-    _audioPlayerManager.updatSongUrl(prevSong.source);
-    setState(() {
-      _song = prevSong;
-    });
-    _resetRotationAnim();
-  }
-
-  void _playRotationAnim(){
+  void _playRotationAnim() {
     _imageAnimationController.forward(from: _curenAnimationPosition);
     _imageAnimationController.repeat();
   }
-  void _pauseRotationAnim(){
-      _stopRotationAnim();
-      _curenAnimationPosition = _imageAnimationController.value;
+
+  void _pauseRotationAnim() {
+    _stopRotationAnim();
+    _curenAnimationPosition = _imageAnimationController.value;
   }
-  void _stopRotationAnim(){
-      _imageAnimationController.stop();
+
+  void _stopRotationAnim() {
+    _imageAnimationController.stop();
   }
-  void _resetRotationAnim(){
-      _curenAnimationPosition = 0.0;
-      _imageAnimationController.value = _curenAnimationPosition;
+
+  void _resetRotationAnim() {
+    _curenAnimationPosition = 0.0;
+    _imageAnimationController.value = _curenAnimationPosition;
   }
 }
 
